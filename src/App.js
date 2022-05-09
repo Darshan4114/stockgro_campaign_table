@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 import styl from "./styles/css/App.module.css";
 
@@ -15,8 +15,9 @@ import TableContainer from "@mui/material/TableContainer";
 import jsonData from "./data";
 
 function App() {
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState({ pgno: 1 });
   const [pageList, setPageList] = useState([]);
+  const [searchInputValue, setSearchInputValue] = useState("");
   const [campaignList, setCampaignList] = useState(jsonData.slice(0, 10));
 
   const headers = Object.keys(jsonData[0]).filter((h) => h !== "_id");
@@ -25,12 +26,18 @@ function App() {
     const pageList = Array(Math.floor(jsonData.length / 10))
       .fill("1")
       .map((page, idx) => ({ pgno: idx + 1 }));
-    console.log("pagelisyt=t ", pageList);
     setPageList(pageList);
   }, []);
 
-  const handleSearchInput = (e) => {
-    const val = e.target.value;
+  const handlePageChange = (e, pgno) => {
+    setPage({ pgno });
+    setSearchInputValue("");
+    setCampaignList(jsonData.slice((pgno - 1) * 10, (pgno - 1) * 10 + 10));
+  };
+
+  const debounceSearchInput = debounce((val) => {
+    //To demo the debounce
+    console.log("Running search: ", val);
     if (val) {
       const filteredCampaignList = jsonData
         .filter((campaign) => {
@@ -43,13 +50,26 @@ function App() {
         jsonData.slice((page.pgno - 1) * 10, (page.pgno - 1) * 10 + 10)
       );
     }
-    console.log("searching for", val);
-  };
+  });
 
-  const handlePageChange = (e, pgno) => {
-    setPage({ pgno });
-    setCampaignList(jsonData.slice((pgno - 1) * 10, (pgno - 1) * 10 + 10));
-  };
+  //Search function
+  const handleSearchInput = useCallback(debounceSearchInput, []);
+
+  //Running search when input changes
+  useEffect(() => {
+    handleSearchInput(searchInputValue);
+  }, [handleSearchInput, searchInputValue]);
+
+  //Function to debounce the search input
+  function debounce(func, timeout = 300) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        func.apply(this, args);
+      }, timeout);
+    };
+  }
 
   return (
     <div className={styl.app}>
@@ -58,7 +78,8 @@ function App() {
           id="searchBar"
           label="Search by name"
           variant="outlined"
-          onChange={handleSearchInput}
+          value={searchInputValue}
+          onChange={(e) => setSearchInputValue(e.target.value)}
         />
         <TableContainer className={styl.table} component={Paper}>
           <Table
@@ -70,7 +91,7 @@ function App() {
               <TableRow>
                 {headers.length > 0 &&
                   headers.map((header) => (
-                    <TableCell>
+                    <TableCell key={header}>
                       {header.replace(/^\w/, (c) => c.toUpperCase())}
                     </TableCell>
                   ))}
@@ -85,39 +106,18 @@ function App() {
                   >
                     {headers.length > 0 &&
                       headers.map((header) => (
-                        <TableCell>{campaign[header]}</TableCell>
+                        <TableCell key={`${header}_${campaign._id}`}>
+                          {campaign[header]}
+                        </TableCell>
                       ))}
                   </TableRow>
                 ))}
             </TableBody>
           </Table>
         </TableContainer>
-
-        {/* <table>
-          <thead>
-            {headers.length > 0 && headers.map((header) => <th>{header}</th>)}
-          </thead>
-          <tbody>
-            {campaignList.length > 0 &&
-              campaignList.map((campaign) => (
-                <tr key={campaign._id}>
-                  {headers.length > 0 &&
-                    headers.map((header) => <td>{campaign[header]}</td>)}
-                </tr>
-              ))}
-          </tbody>
-        </table> */}
-        {/* <div className={styl.pagination}>
-          {pageList.length > 0 &&
-            pageList.map((page) => (
-              <button onClick={() => handlePageChange(page.pgno)}>
-                {page.pgno}
-              </button>
-            ))}
-        </div> */}
         <Pagination
           className={styl.pagination}
-          count={10}
+          count={pageList.length}
           color="secondary"
           onChange={handlePageChange}
         />
